@@ -14,10 +14,8 @@ import os
 
 tf.get_logger().setLevel("ERROR")
 
-# VaskaDataSetPath = "H:/Datasets/MagistracyDiploma/Images/vaska"
-# VaskaImagesLess02 = "H:/Datasets/MagistracyDiploma/Images/vaska_bad"
-VaskaDataSetPath = "H:/Datasets/MagistracyDiploma/Images/vaska_temp"
-VaskaImagesLess02 = "H:/Datasets/MagistracyDiploma/Images/vaska_bad_temp"
+VaskaDataSetPath = "H:/Datasets/MagistracyDiploma/Images/vaska"
+VaskaImagesLess02 = "H:/Datasets/MagistracyDiploma/Images/vaska_bad"
 
 SEED = 1337
 IMAGE_SIZE = (300, 300) # EfficientNetB3
@@ -94,13 +92,13 @@ def process_file_prediction(file_path):
 
 
 if __name__ == "__main__":
-    # Collect all file paths
-    file_paths = list(Path(VaskaDataSetPath).glob("*.jpg"))
-
     # Use ProcessPoolExecutor instead of ThreadPoolExecutor
     # Set max_workers to a reasonable number based on your CPU cores
     num_workers = os.cpu_count()  # Default to 4 if cpu_count returns None
     print(num_workers)
+
+    # Collect all file paths
+    file_paths = list(Path(VaskaDataSetPath).glob("*.jpg"))
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=num_workers) as executor:
         file_predictions = list(tqdm(
@@ -108,10 +106,14 @@ if __name__ == "__main__":
             total=len(file_paths)
         ))
 
-    for i in file_predictions:
-        if i[1]["n"] > 0.65:
-            print(i[0], i[1])
-            move(i[0], VaskaImagesLess02)
+    for i in tqdm(file_predictions):
+        if i[1] is not None:
+            if i[1]["n"] > 0.7:
+                print(i[0], i[1])
+                if os.path.exists(i[0]):
+                    move(i[0], VaskaImagesLess02)
+                else:
+                    print(f"File {i[0]} no longer exists, skipping move operation")
 
     # for f in Path(VaskaDataSetPath).glob("*.jpg"):
     #     p = predict_image(MODEL, f)
