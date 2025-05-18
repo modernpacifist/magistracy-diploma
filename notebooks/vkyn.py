@@ -82,7 +82,7 @@ def build_vkyn01():
     return model
 
 
-def build_model(input_shape, num_classes: int, dropout_rate: float):
+def _build_model(input_shape, num_classes: int, dropout_rate: float):
     inputs = tf.keras.layers.Input(shape=input_shape)
     x = inputs
     cnn = tf.keras.applications.EfficientNetB3(
@@ -278,7 +278,7 @@ def run_predict(options: Options):
     image_size = (options.image_size, options.image_size)
 
     # Create an instance of model
-    model = build_model(
+    model = _build_model(
         input_shape=image_size + (3,),
         num_classes=2,
         dropout_rate=0.5,
