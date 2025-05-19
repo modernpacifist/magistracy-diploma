@@ -1,30 +1,48 @@
 import tensorflow as tf
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 from pathlib import Path
-from PIL import Image as pil
-from PIL.Image import Image
 from shutil import move, copy
-from vkyn import *
 import concurrent.futures
 from tqdm.notebook import tqdm
+import numpy as np
 import os
 
 tf.get_logger().setLevel("ERROR")
 
-VaskaDataSetPath = "H:/Datasets/MagistracyDiploma/Images/vaska"
-VaskaImagesLess02 = "H:/Datasets/MagistracyDiploma/Images/vaska_bad"
+VaskaDataSetPath = "H:/Datasets/MagistracyDiploma/Images/vaska_clean_bak"
+VaskaImagesDistributedPath = "H:/Datasets/MagistracyDiploma/Images/vaska_distributed_probability_07"
 
 SEED = 1337
-IMAGE_SIZE = (300, 300) # EfficientNetB3
+IMAGE_SIZE = (300, 300) # EfficientNetB5
 BATCH_SIZE = 128
+NUM_CLASSES = 13
+DROPOUT_RATE = 0.3
+CLASS_NAMES = [
+    'activity',
+    'animal',
+    'city',
+    'indoor',
+    'kebab',
+    'nature',
+    'object',
+    'other',
+    'outdoor',
+    'painting',
+    'people',
+    'transport',
+    'vegetable'
+]
+
+
+for class_name in CLASS_NAMES:
+    class_dir = Path(VaskaImagesDistributedPath) / class_name
+    class_dir.mkdir(exist_ok=True, parents=True)
+    print(f"Created directory: {class_dir}")
 
 
 def _build_model(input_shape, num_classes: int, dropout_rate: float):
     inputs = tf.keras.layers.Input(shape=input_shape)
-    cnn = tf.keras.applications.EfficientNetB3(
+    cnn = tf.keras.applications.EfficientNetB5(
         input_tensor=inputs,
         include_top=False,
         weights="imagenet",
@@ -55,11 +73,11 @@ def _build_model(input_shape, num_classes: int, dropout_rate: float):
 
 MODEL, _ = _build_model(
     input_shape=IMAGE_SIZE + (3,),
-    num_classes=2,
-    dropout_rate=0.3,
+    num_classes=NUM_CLASSES,
+    dropout_rate=DROPOUT_RATE,
 )
 
-MODEL.load_weights("./weights/vkyn01-tf-efficientnetb3_5_epochs_dropout_03_learningrate1e-3_epochs.keras")
+MODEL.load_weights("./weights/tf-efficientnetb5_multiclass_50epoch_dropout04_learningrate1e-4_epochs.keras")
 
 
 def process_image(path: Path):
@@ -69,14 +87,21 @@ def process_image(path: Path):
     return img_array
 
 
-def predict_image(model, path: Path) -> dict[str, float]:
+def predict_image(model, path: Path):
     img_array = process_image(path)
-    predictions = model.predict(img_array, verbose=0)
-    score = predictions[0][0]
-    return {
-        "y": score,
-        "n": 1 - score,
+    predictions = model.predict(img_array, verbose=1)
+
+    # Get the class with highest probability
+    predicted_class_idx = np.argmax(predictions[0])
+    predicted_probability = predictions[0][predicted_class_idx]
+    
+    result = {
+        "class_index": int(predicted_class_idx),
+        "probability": float(predicted_probability),
+        "class_name": CLASS_NAMES[predicted_class_idx]
     }
+
+    return result
 
 
 def process_file_prediction(file_path):
@@ -100,11 +125,11 @@ def process_batch(batch_files):
         file_prediction = process_file_prediction(file_path)
         results.append(file_prediction)
         
-        # Move files that meet the criteria right in the batch
-        if file_prediction[1] is not None and file_prediction[1]["n"] > 0.7:
+        # Move files that meet the criteria right in the batch, only if the probability is greater than 0.5
+        if file_prediction[1] is not None and file_prediction[1]["probability"] > 0.5:
             print(file_prediction[0], file_prediction[1])
             if os.path.exists(file_prediction[0]):
-                move(file_prediction[0], VaskaImagesLess02)
+                move(file_prediction[0], f"{VaskaImagesDistributedPath}/{file_prediction[1]['class_name']}")
                 moved_count += 1
             else:
                 print(f"File {file_prediction[0]} no longer exists, skipping move operation")
@@ -158,7 +183,7 @@ if __name__ == "__main__":
             file_predictions.extend(batch_result)
             total_moved += moved_count
     
-    print(f"Moved {total_moved} files to {VaskaImagesLess02}")
+    print(f"Moved {total_moved} files to {VaskaImagesDistributedPath}")
 
     # for f in Path(VaskaDataSetPath).glob("*.jpg"):
     #     p = predict_image(MODEL, f)
