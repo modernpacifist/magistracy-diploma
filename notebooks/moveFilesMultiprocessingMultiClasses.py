@@ -126,7 +126,7 @@ def process_batch(batch_files):
         results.append(file_prediction)
         
         # Move files that meet the criteria right in the batch, only if the probability is greater than 0.5
-        if file_prediction[1] is not None and file_prediction[1]["probability"] > 0.5:
+        if file_prediction[1] is not None and file_prediction[1]["probability"] > 0.7:
             print(file_prediction[0], file_prediction[1])
             if os.path.exists(file_prediction[0]):
                 move(file_prediction[0], f"{VaskaImagesDistributedPath}/{file_prediction[1]['class_name']}")
